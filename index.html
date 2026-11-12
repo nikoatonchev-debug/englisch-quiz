@@ -299,7 +299,7 @@ const FRAGEN = [
   e:'Nachbar heißt neighbour. In Amerika schreibt man neighbor. Beides ist richtig.'}
 ];
 /* Speicherdienst: Adresse und öffentlicher Schlüssel. Sind beide leer, wird nichts gespeichert. */
-const SPEICHERDIENST = { adresse:'', schluessel:'' };
+const SPEICHERDIENST = { adresse:'https://zkwxrulbnkhqepzipnrm.supabase.co', schluessel:'sb_publishable_aQKaCGVp7-CRK6Y7JHwk5g_aSs3JfBw' };
 const MIT_SPEICHERN = !!(SPEICHERDIENST.adresse && SPEICHERDIENST.schluessel);
 let adminDaten = null;
 function dienstKopf(mehr){ return Object.assign({'apikey':SPEICHERDIENST.schluessel,'Authorization':'Bearer '+SPEICHERDIENST.schluessel,'Content-Type':'application/json'}, mehr||{}); }
