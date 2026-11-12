@@ -340,7 +340,7 @@ function adminHtml(){
   } else {
     innen = `<h2 id="admin-titel">Auswertung</h2>
       <label class="klein" for="admincode">Code eingeben</label>
-      <input class="eingabe" id="admincode" type="password" inputmode="numeric" autocomplete="off">
+      <input class="eingabe" id="admincode" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       ${z.admin==='falsch'?'<p class="daneben">Der Code ist falsch.</p>':''}
       ${z.admin==='stoerung'?'<p class="daneben">Die Auswertung ist gerade nicht erreichbar. Versuch es gleich noch einmal.</p>':''}
       ${z.admin==='laedt'?'<p class="leise">Wird geladen …</p>':''}
