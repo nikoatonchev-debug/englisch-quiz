@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Englisch-Quiz Klasse 8</title>
+<title>Englisch lernen Klasse 8</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
 /* Aufbau: ein Heftblatt pro Aufgabe, schmale Spalte fürs Handy, Fortschritt oben, Knöpfe unten */
@@ -104,6 +104,29 @@ input.eingabe:focus{border-color:var(--tinte)}
 .zahlen b{display:block;font-family:var(--kopf);font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}
 .offen{display:flex;flex-wrap:wrap;gap:8px}
 .offen button{background:var(--falsch-hell);color:var(--falsch);border:none;border-radius:8px;padding:10px 14px;font-weight:600;min-width:48px}
+.oben{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.themen{display:flex;flex-direction:column;gap:10px}
+.thema{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left;background:var(--blatt);border:1px solid var(--linie);border-radius:10px;padding:14px}
+.thema .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.thema .tx .leise{font-size:.88rem;line-height:1.35}
+.nr{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--tinte-hell);color:var(--tinte);font-family:var(--kopf);font-weight:700}
+.nr.ok{background:var(--gut-hell);color:var(--gut)}
+.chip{font-size:.8rem;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--tinte-hell);color:var(--tinte);white-space:nowrap}
+.chip.gut{background:var(--gut-hell);color:var(--gut)}
+@media (max-width:420px){.thema{grid-template-columns:auto 1fr}.thema .chip{grid-column:2;justify-self:start}}
+.rueck{border-radius:8px;padding:12px 14px;font-size:.97rem}
+.rueck.gut{background:var(--gut-hell)} .rueck.gut b{color:var(--gut)}
+.rueck.falsch{background:var(--falsch-hell)} .rueck.falsch b{color:var(--falsch)}
+.rueck.tipp{background:var(--tipp-hell)} .rueck.tipp b{color:var(--tipp)}
+.opt:disabled{cursor:default}
+.opt.opt-gut{border-color:var(--gut);background:var(--gut-hell);color:var(--gut)}
+.opt.opt-falsch{border-color:var(--falsch);background:var(--falsch-hell);color:var(--falsch);text-decoration:line-through;opacity:.8}
+input.eingabe.ein-gut{border-color:var(--gut);background:var(--gut-hell)}
+input.eingabe.ein-falsch{border-color:var(--falsch);background:var(--falsch-hell)}
+.regel-klein{font-size:.95rem;border-top:1px solid var(--linie);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.zahlen.drei{grid-template-columns:repeat(3,1fr)}
+@media (max-width:420px){.zahlen.drei{grid-template-columns:1fr 1fr}.zahlen.drei div:last-child{grid-column:1 / -1}}
+.klein-text{font-size:.85rem}
 </style>
 </head>
 <body>
@@ -301,15 +324,50 @@ const FRAGEN = [
 /* Speicherdienst: Adresse und öffentlicher Schlüssel. Sind beide leer, wird nichts gespeichert. */
 const SPEICHERDIENST = { adresse:'https://zkwxrulbnkhqepzipnrm.supabase.co', schluessel:'sb_publishable_aQKaCGVp7-CRK6Y7JHwk5g_aSs3JfBw' };
 const MIT_SPEICHERN = !!(SPEICHERDIENST.adresse && SPEICHERDIENST.schluessel);
+const THEMEN = Object.keys(TEILE);
+const NACH_ID = Object.fromEntries(FRAGEN.map(f=>[f.id,f]));
+const SPEICHER = 'englisch-lernen-kl8';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm = s => String(s||'').toLowerCase().replace(/[’‘`´]/g,"'").replace(/\s+/g,' ').trim().replace(/[.!?]+$/,'').trim();
+const fragenVon = k => FRAGEN.filter(f=>f.s===k);
+
+let z = { ok:false, name:'', fertig:{}, ansicht:'start', thema:null, liste:[], pos:0,
+  versuche:{}, erst:{}, weg:{}, wahl:null, text:'', status:null, hinweis:false, regelAuf:false,
+  wiederholung:false, nameFehlt:false, fragtNeu:false, admin:null, sende:null };
 let adminDaten = null;
+
+function laden(){
+  try{ const s = JSON.parse(localStorage.getItem(SPEICHER));
+    if(s && typeof s==='object'){ z.ok = s.ok===true; z.name = typeof s.name==='string' ? s.name : '';
+      z.fertig = (s.fertig && typeof s.fertig==='object') ? s.fertig : {}; } }catch(e){}
+  z.ansicht = z.name.trim() || !MIT_SPEICHERN && Object.keys(z.fertig).length ? 'uebersicht' : 'start';
+}
+function sichern(){ try{ localStorage.setItem(SPEICHER, JSON.stringify({ok:z.ok===true, name:z.name, fertig:z.fertig})); }catch(e){} }
+
+function loesung(f){ return f.o ? f.o[f.a] : f.a[0].replace(/'/g,'’'); }
+function istRichtig(f){ return f.o ? z.wahl===f.a : f.a.map(norm).includes(norm(z.text)); }
+function satzHtml(f, fuell){
+  let i=0; const teile = fuell ? String(fuell).split(' … ') : [];
+  let h = esc(f.q).replace(/___/g, ()=>`<span class="luecke">${fuell ? esc(teile[i++]||teile[0]) : '&nbsp;'}</span>`);
+  if(f.k) h += ` <span class="klammer">(${esc(f.k)})</span>`;
+  return h;
+}
+function naechstesThema(nach){
+  const start = nach ? THEMEN.indexOf(nach)+1 : 0;
+  for(let i=0;i<THEMEN.length;i++){ const k=THEMEN[(start+i)%THEMEN.length]; if(!z.fertig[k]) return k; }
+  return nach && THEMEN.indexOf(nach) < THEMEN.length-1 ? THEMEN[THEMEN.indexOf(nach)+1] : null;
+}
+
+/* ---------- Speichern und Auswertung ---------- */
 function dienstKopf(mehr){ return Object.assign({'apikey':SPEICHERDIENST.schluessel,'Authorization':'Bearer '+SPEICHERDIENST.schluessel,'Content-Type':'application/json'}, mehr||{}); }
-async function senden(){
-  const teile={};
-  Object.keys(TEILE).forEach(k=>{ const g=FRAGEN.filter(f=>f.s===k); teile[k]=[g.filter(stimmt).length, g.length]; });
+let letzteSendung = null;
+async function senden(daten){
+  if(daten) letzteSendung = daten;
+  if(!MIT_SPEICHERN || !letzteSendung) return;
   z.sende='laeuft'; zeigen();
   try{
     const r = await fetch(SPEICHERDIENST.adresse+'/rest/v1/ergebnisse', {method:'POST', headers:dienstKopf({'Prefer':'return=minimal'}),
-      body:JSON.stringify({name:(z.name||'').trim().slice(0,30)||'Ohne Namen', richtig:FRAGEN.filter(stimmt).length, gesamt:FRAGEN.length, teile})});
+      body:JSON.stringify(letzteSendung)});
     z.sende = r.ok ? 'ok' : 'fehler';
   }catch(e){ z.sende='fehler'; }
   zeigen();
@@ -323,99 +381,70 @@ async function auswertungHolen(code){
   }catch(e){ z.admin='stoerung'; }
   zeigen();
 }
+function gruppieren(zeilen){
+  const m = new Map();
+  (Array.isArray(zeilen)?zeilen:[]).forEach(e=>{
+    const anzeige = String(e.name||'Ohne Namen').trim() || 'Ohne Namen';
+    const key = anzeige.toLowerCase();
+    if(!m.has(key)) m.set(key, {name:anzeige, zuletzt:e.erstellt||'', themen:{}});
+    const p = m.get(key);
+    if(e.erstellt && String(e.erstellt) > String(p.zuletzt)) p.zuletzt = e.erstellt;
+    const t = (e.teile && typeof e.teile==='object') ? e.teile : {};
+    Object.keys(t).forEach(k=>{ if(TEILE[k] && Array.isArray(t[k]) && !p.themen[k]) p.themen[k] = t[k]; });
+  });
+  return [...m.values()].sort((a,b)=>String(b.zuletzt).localeCompare(String(a.zuletzt)));
+}
+function zeitText(s){ try{ return s ? new Date(s).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' Uhr' : ''; }catch(e){ return ''; } }
 function adminHtml(){
   let innen;
   if(z.admin==='liste'){
-    const d = Array.isArray(adminDaten) ? adminDaten : [];
-    const schnitt = d.length ? Math.round(d.reduce((s,e)=>s+(e.richtig||0),0)/d.length*10)/10 : 0;
-    innen = `<h2 id="admin-titel">Auswertung</h2>
-      <div class="zahlen"><div><b>${d.length}</b>haben das Quiz beendet</div><div><b>${String(schnitt).replace('.',',')}</b>Aufgaben richtig im Schnitt</div></div>
-      ${d.length ? `<div class="liste">${d.map(e=>{
-        const t = e.teile||{};
-        const zeit = e.erstellt ? new Date(e.erstellt).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-        return `<div class="eintrag"><div class="zeile"><span class="wer">${esc(e.name||'Ohne Namen')}</span><b>${Number(e.richtig)||0} von ${Number(e.gesamt)||0}</b></div>
-          <span class="leise">${Object.keys(TEILE).filter(k=>Array.isArray(t[k])).map(k=>`${TEILE[k].name} ${Number(t[k][0])||0}/${Number(t[k][1])||0}`).join(' · ')}</span>
-          <span class="leise">${esc(zeit)} Uhr</span></div>`; }).join('')}</div>` : '<p class="leise">Noch hat niemand das Quiz beendet.</p>'}
+    const leute = gruppieren(adminDaten);
+    const alles = leute.filter(p=>THEMEN.every(k=>p.themen[k])).length;
+    const summe = leute.reduce((s,p)=>s+THEMEN.filter(k=>p.themen[k]).length,0);
+    innen = `<h2 id="admin-titel">Lernstand</h2>
+      <div class="zahlen drei"><div><b>${leute.length}</b>haben gelernt</div><div><b>${alles}</b>haben alle Themen fertig</div><div><b>${summe}</b>Themen abgeschlossen</div></div>
+      ${leute.length ? `<div class="liste">${leute.map(p=>{
+        const fertigK = THEMEN.filter(k=>p.themen[k]); const offen = THEMEN.filter(k=>!p.themen[k]);
+        return `<div class="eintrag"><div class="zeile"><span class="wer">${esc(p.name)}</span><b>${fertigK.length} von ${THEMEN.length} Themen</b></div>
+          <div class="balken"><i style="width:${fertigK.length/THEMEN.length*100}%"></i></div>
+          ${fertigK.length?`<span>${fertigK.map(k=>`${esc(TEILE[k].name)} <b>${Number(p.themen[k][0])||0}/${Number(p.themen[k][1])||0}</b>`).join(' · ')}</span>`:''}
+          ${offen.length?`<span class="leise">Noch offen: ${offen.map(k=>esc(TEILE[k].name)).join(', ')}</span>`:'<span class="richtig">Alles gelernt</span>'}
+          <span class="leise">Zuletzt: ${esc(zeitText(p.zuletzt))}</span></div>`; }).join('')}</div>`
+        : '<p class="leise">Noch hat niemand ein Thema abgeschlossen.</p>'}
+      <p class="leise klein-text">Die Zahlen zeigen, wie viele Aufgaben beim ersten Versuch richtig waren.</p>
       <div class="knoepfe"><button class="neben" style="flex:1" data-tun="adminzu">Schließen</button></div>`;
   } else {
-    innen = `<h2 id="admin-titel">Auswertung</h2>
+    innen = `<h2 id="admin-titel">Lernstand ansehen</h2>
       <label class="klein" for="admincode">Code eingeben</label>
       <input class="eingabe" id="admincode" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       ${z.admin==='falsch'?'<p class="daneben">Der Code ist falsch.</p>':''}
-      ${z.admin==='stoerung'?'<p class="daneben">Die Auswertung ist gerade nicht erreichbar. Versuch es gleich noch einmal.</p>':''}
+      ${z.admin==='stoerung'?'<p class="daneben">Der Lernstand ist gerade nicht erreichbar. Versuch es gleich noch einmal.</p>':''}
       ${z.admin==='laedt'?'<p class="leise">Wird geladen …</p>':''}
       <div class="knoepfe stapel"><button class="haupt" data-tun="adminok">Anzeigen</button><button class="neben" data-tun="adminzu">Abbrechen</button></div>`;
   }
   return `<div class="schleier" data-tun="adminzu"><div class="fenster breit" role="dialog" aria-modal="true" aria-labelledby="admin-titel" data-tun="nichts">${innen}</div></div>`;
 }
 
-const NACH_ID =Object.fromEntries(FRAGEN.map(f=>[f.id,f]));
-const SPEICHER = 'englischquiz-kl8-v2';
-let z = {phase:'start', aktiv:FRAGEN.map(f=>f.id), pos:0, antw:{}, tippAuf:false};
-
-function laden(){ try{ const s = JSON.parse(localStorage.getItem(SPEICHER)); if(s && s.aktiv && s.antw){ z = Object.assign(z, s, {tippAuf:false}); } }catch(e){} }
-function sichern(){ try{ localStorage.setItem(SPEICHER, JSON.stringify({ok:z.ok===true,name:z.name||'',phase:z.phase,aktiv:z.aktiv,pos:z.pos,antw:z.antw})); }catch(e){} }
-
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const norm = s => String(s||'').toLowerCase().replace(/[’‘`´]/g,"'").replace(/\s+/g,' ').trim().replace(/[.!?]+$/,'').trim();
-
-function schritte(){
-  const out=[]; let letzter=null;
-  z.aktiv.forEach(id=>{ const f=NACH_ID[id]; if(f.s!==letzter){ out.push({regel:f.s}); letzter=f.s; } out.push({frage:f}); });
-  out.push({abgabe:true});
-  return out;
-}
-function beantwortet(f){ const a=z.antw[f.id]; return f.o ? typeof a==='number' : norm(a)!==''; }
-function stimmt(f){ const a=z.antw[f.id]; return f.o ? a===f.a : f.a.map(norm).includes(norm(a)); }
-function loesung(f){ return f.o ? f.o[f.a] : f.a[0].replace(/'/g,'’'); }
-function satzHtml(f, fuell){
-  let i=0; const teile = fuell ? String(fuell).split(' … ') : [];
-  let h = esc(f.q).replace(/___/g, ()=>`<span class="luecke">${fuell ? esc(teile[i++]||teile[0]) : '&nbsp;'}</span>`);
-  if(f.k) h += ` <span class="klammer">(${esc(f.k)})</span>`;
-  return h;
-}
-
-function zeigen(){
-  const app=document.getElementById('app');
-  let h = z.ok!==true ? torHtml() : z.phase==='start' ? startHtml() : z.phase==='ergebnis' ? ergebnisHtml() : laufHtml();
-  if(z.ok===true && z.phase!=='start') h =`<div class="oben"><button class="vorne" data-tun="neufrage">↺ Von vorne anfangen</button></div>` + h;
-  if(z.fragtNeu) h += `<div class="schleier" data-tun="neunein">
-    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="fenster-titel" data-tun="nichts">
-      <h2 id="fenster-titel">Wirklich von vorne anfangen?</h2>
-      <p>Alle deine Antworten werden gelöscht. Du landest wieder auf dem Startbildschirm.</p>
-      <div class="knoepfe stapel">
-        <button class="haupt" data-tun="neu">Ja, von vorne anfangen</button>
-        <button class="neben" data-tun="neunein">Nein, weitermachen</button>
-      </div>
-    </div></div>`;
-  if(MIT_SPEICHERN) h += `<div class="fuss"><button class="punkt" data-tun="punkt" aria-label="Auswertung öffnen"></button></div>`;
-  if(z.admin) h += adminHtml();
-  app.innerHTML = h;
-  if(z.fragtNeu && document.querySelector){ const k=document.querySelector('.fenster .neben'); if(k) k.focus(); }
-  if(z.admin && z.admin!=='liste' && z.admin!=='laedt'){ const c=document.getElementById('admincode'); if(c) c.focus(); }
-  sichern();
-}
-
+/* ---------- Ansichten ---------- */
 function torHtml(){
   if(z.ok==='nein') return `
   <div class="blatt">
     <p class="klein">Kein Zutritt</p>
     <h1>Ohne Zustimmung geht es nicht weiter</h1>
-    <p>Du hast „Nicht akzeptieren“ gewählt. Deshalb kannst du das Quiz nicht öffnen.</p>
+    <p>Du hast „Nicht akzeptieren“ gewählt. Deshalb kannst du die Lernseite nicht öffnen.</p>
   </div>
   <div class="knoepfe"><button class="neben" style="flex:1" data-tun="torzurueck">Zurück zur Auswahl</button></div>`;
   return `
   <div class="blatt">
     <p class="klein">Englisch · Klasse 8</p>
     <h1>Bevor es losgeht</h1>
-    <p>Bitte lies kurz, wie das Quiz funktioniert, und stimme zu:</p>
+    <p>Bitte lies kurz, wie die Lernseite funktioniert, und stimme zu:</p>
     <div class="regel"><ul>
-      <li>Das Quiz ist zum Üben. Es gibt keine Noten.</li>
-      <li>Die Lösungen siehst du erst ganz am Ende.</li>
+      <li>Hier lernst du die englischen Zeiten Schritt für Schritt. Es gibt keine Noten.</li>
       ${MIT_SPEICHERN
-        ? `<li><b>Dein Ergebnis wird gespeichert, wenn du fertig bist:</b> dein Spitzname, wie viele Aufgaben du in jedem Teil richtig hattest, und die Uhrzeit.</li>
-           <li>Sehen kann das nur, wer dieses Quiz erstellt hat. Nimm einen Spitznamen, nicht deinen vollen Namen.</li>`
-        : `<li>Deine Antworten werden nur auf diesem Gerät gespeichert, damit nichts verloren geht. Niemand sonst kann sie sehen.</li>`}
+        ? `<li><b>Wenn du ein Thema fertig hast, wird das gespeichert:</b> dein Spitzname, welches Thema, wie viele Aufgaben du beim ersten Versuch richtig hattest, und die Uhrzeit.</li>
+           <li>Sehen kann das nur, wer diese Seite erstellt hat. Nimm einen Spitznamen, nicht deinen vollen Namen.</li>`
+        : `<li>Dein Lernstand wird nur auf diesem Gerät gespeichert. Niemand sonst kann ihn sehen.</li>`}
     </ul></div>
   </div>
   <div class="knoepfe stapel">
@@ -428,16 +457,16 @@ function startHtml(){
   return `
   <div class="blatt">
     <p class="klein">Englisch · Klasse 8</p>
-    <h1>Fit für die Prüfung morgen</h1>
-    <p>36 Aufgaben in acht kurzen Teilen: alle wichtigen Zeiten von Simple Present bis Zukunft, dann alles gemischt und zum Schluss unregelmäßige Verben und Vokabeln. Dauert etwa 20 Minuten.</p>
+    <h1>Englisch lernen</h1>
+    <p>Hier lernst du alle wichtigen Zeiten in ${THEMEN.length} kleinen Themen. Bei jedem Thema liest du zuerst die Regel. Danach übst du ein paar Aufgaben.</p>
   </div>
   <div class="blatt schlicht">
     <h3>So läuft es</h3>
     <div class="regel"><ul>
-      <li>Vor jedem Teil steht kurz die Regel. Lies sie in Ruhe.</li>
-      <li>Kommst du nicht weiter, tippe auf <b>Tipp anzeigen</b>. Der Tipp erklärt dir den Weg, verrät aber nicht die Antwort.</li>
-      <li>Die Lösungen siehst du erst ganz am Ende – mit Erklärung zu jeder Aufgabe.</li>
-      <li>Danach kannst du nur deine Fehler noch einmal üben. Mach das, bis alles sitzt.</li>
+      <li>Nach jeder Aufgabe siehst du sofort, ob sie richtig ist.</li>
+      <li>Falsch? Kein Problem. Du bekommst einen Tipp und darfst es noch einmal versuchen.</li>
+      <li>Klappt es wieder nicht, siehst du die Lösung mit Erklärung.</li>
+      <li>Du kannst die Themen in jeder Reihenfolge lernen und jederzeit wiederholen.</li>
     </ul></div>
   </div>
   ${MIT_SPEICHERN ? `<div class="blatt schlicht">
@@ -448,141 +477,210 @@ function startHtml(){
   <div class="knoepfe"><button class="haupt" data-tun="los">Los geht’s</button></div>`;
 }
 
-function laufHtml(){
-  const sch=schritte(); const st=sch[z.pos]; const n=z.aktiv.length;
-  const erledigt=z.aktiv.filter(id=>beantwortet(NACH_ID[id])).length;
-  let kopf=`<div class="kopfzeile"><span class="klein">${erledigt} von ${n} beantwortet</span></div>
-    <div class="balken" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${erledigt}"><i style="width:${n?erledigt/n*100:0}%"></i></div>`;
-  let mitte='';
-  if(st.regel){
-    const t=TEILE[st.regel];
-    mitte=`<div class="blatt regel">
-      <p class="klein">Kurz erklärt</p><h2>${t.name}</h2><p>${t.wann}</p>
-      <ul>${t.regel.map(r=>`<li>${r}</li>`).join('')}</ul>
-      <p class="bsp">${esc(t.bsp)}</p></div>`;
-  } else if(st.frage){
-    const f=st.frage; const nr=z.aktiv.indexOf(f.id)+1;
-    let eingabe;
-    if(f.o){
-      eingabe=`<div class="wahl">${f.o.map((o,i)=>`<button class="opt" aria-pressed="${z.antw[f.id]===i}" data-tun="wahl" data-i="${i}">${esc(o)}</button>`).join('')}</div>`;
-    } else {
-      eingabe=`<label class="klein" for="eingabe-${f.id}">Deine Antwort</label>
-        <input class="eingabe" id="eingabe-${f.id}" type="text" value="${esc(z.antw[f.id]||'')}" placeholder="Hier schreiben" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="next">`;
-    }
-    mitte=`<div class="blatt">
-      <p class="klein">Aufgabe ${nr} von ${n} · ${TEILE[f.s].name}</p>
-      <p class="satz">${satzHtml(f)}</p>
-      ${eingabe}
-      <button class="tippknopf" data-tun="tipp" aria-expanded="${z.tippAuf}">${z.tippAuf?'Tipp ausblenden':'Tipp anzeigen'}</button>
-      ${z.tippAuf?`<p class="tipp"><b>Tipp:</b> ${esc(f.t)}</p>`:''}
-    </div>`;
-  } else {
-    const offen=z.aktiv.filter(id=>!beantwortet(NACH_ID[id]));
-    mitte=`<div class="blatt">
-      <p class="klein">Fast geschafft</p><h2>Bereit zum Abgeben?</h2>
-      ${offen.length
-        ? `<p>Diese Aufgaben sind noch leer. Tippe auf eine Nummer, um dorthin zu springen:</p>
-           <div class="offen">${offen.map(id=>`<button data-tun="sprung" data-id="${id}">${z.aktiv.indexOf(id)+1}</button>`).join('')}</div>
-           <p class="leise">Leere Aufgaben zählen als falsch.</p>`
-        : `<p>Du hast alle ${n} Aufgaben beantwortet. Nach dem Abgeben siehst du die Lösungen und kannst nichts mehr ändern.</p>`}
-    </div>`;
-  }
-  const letzte = st.abgabe;
-  const knoepfe=`<div class="knoepfe">
-    ${z.pos>0?'<button class="neben" data-tun="zurueck">Zurück</button>':''}
-    ${letzte?'<button class="haupt" data-tun="abgeben">Abgeben und Lösungen sehen</button>'
-            :`<button class="haupt" data-tun="weiter">${st.regel?'Verstanden, weiter':'Weiter'}</button>`}
-  </div>`;
-  return kopf+mitte+knoepfe;
+function leiste(){
+  return `<div class="oben">
+    ${z.ansicht!=='uebersicht' ? '<button class="vorne" data-tun="uebersicht">← Übersicht</button>' : '<span></span>'}
+    <button class="vorne" data-tun="neufrage">↺ Von vorne anfangen</button></div>`;
 }
 
-function ergebnisHtml(){
-  const fr=z.aktiv.map(id=>NACH_ID[id]); const n=fr.length;
-  const ok=fr.filter(stimmt).length; const anteil=n?ok/n:0;
-  const spruch = anteil===1 ? 'Alles richtig. Du bist bereit für morgen.'
-    : anteil>=.85 ? 'Sehr stark. Schau dir die paar Fehler an, dann sitzt es.'
-    : anteil>=.6 ? 'Gute Grundlage. Lies die Erklärungen und übe deine Fehler noch einmal.'
-    : 'Kein Problem – genau dafür übst du. Lies die Erklärungen in Ruhe und übe die Fehler noch einmal.';
-  const teile=Object.keys(TEILE).map(k=>{ const g=fr.filter(f=>f.s===k); if(!g.length) return ''; const r=g.filter(stimmt).length;
-    return `<div class="teil"><span>${TEILE[k].name}</span><b>${r} / ${g.length}</b><div class="balken"><i style="width:${r/g.length*100}%"></i></div></div>`; }).join('');
-  const liste=fr.map((f,i)=>{ const r=stimmt(f); const a=z.antw[f.id];
-    const mein = !beantwortet(f) ? '– leer –' : (f.o ? f.o[a] : a);
-    return `<div class="blatt erg ${r?'ok':'nein'}">
-      <span class="marke">${r?'Richtig':'Falsch'} · Aufgabe ${i+1}</span>
-      <p class="satz">${satzHtml(f, loesung(f))}</p>
-      <dl class="paar">
-        ${r?'':`<dt>Deine Antwort</dt><dd class="daneben">${esc(mein)}</dd>`}
-        <dt>Richtig ist</dt><dd class="richtig">${esc(loesung(f))}</dd>
-      </dl>
-      <p class="erkl"><b>Warum?</b> ${esc(f.e)}</p>
-    </div>`; }).join('');
-  const fehler=n-ok;
+function uebersichtHtml(){
+  const n = THEMEN.filter(k=>z.fertig[k]).length;
+  const weiter = naechstesThema(null);
   return `
   <div class="blatt">
-    <p class="klein">Dein Ergebnis</p>
-    <p class="note">${ok} <span class="leise" style="font-size:1.4rem">von ${n}</span></p>
-    <p>${spruch}</p>
-    ${z.sende==='laeuft'?'<p class="leise">Dein Ergebnis wird gespeichert …</p>':''}
-    ${z.sende==='ok'?'<p class="richtig">Dein Ergebnis wurde gespeichert.</p>':''}
-    ${z.sende==='fehler'?'<p class="daneben">Das Speichern hat nicht geklappt. <button class="tippknopf" data-tun="senden">Noch einmal versuchen</button></p>':''}
-    ${teile}
+    <p class="klein">${z.name.trim() ? 'Hallo '+esc(z.name.trim()) : 'Englisch · Klasse 8'}</p>
+    <h1>Was willst du lernen?</h1>
+    <p><b>${n} von ${THEMEN.length}</b> Themen gelernt</p>
+    <div class="balken" role="progressbar" aria-valuemin="0" aria-valuemax="${THEMEN.length}" aria-valuenow="${n}"><i style="width:${n/THEMEN.length*100}%"></i></div>
+    ${n===THEMEN.length ? '<p class="richtig"><b>Du hast alle Themen gelernt. Stark!</b> Du kannst jedes Thema jederzeit wiederholen.</p>' : ''}
+    ${weiter ? `<div class="knoepfe"><button class="haupt" data-tun="thema" data-k="${weiter}">${n?'Weiter mit':'Anfangen mit'}: ${esc(TEILE[weiter].name)}</button></div>` : ''}
   </div>
-  <div class="knoepfe stapel">
-    ${fehler?`<button class="haupt" data-tun="fehler">Meine ${fehler} Fehler noch einmal üben</button>`:''}
-    <button class="${fehler?'neben':'haupt'}" data-tun="neu">Ganz von vorne anfangen</button>
+  <div class="themen">${THEMEN.map((k,i)=>{ const f=z.fertig[k];
+    return `<button class="thema" data-tun="thema" data-k="${k}">
+      <span class="nr ${f?'ok':''}">${f?'✓':i+1}</span>
+      <span class="tx"><b>${esc(TEILE[k].name)}</b><span class="leise">${esc(TEILE[k].wann)}</span></span>
+      <span class="chip ${f?'gut':''}">${f?`Gelernt · ${f.r}/${f.g}`:'Neu'}</span>
+    </button>`; }).join('')}</div>`;
+}
+
+function regelListe(t){ return `<ul>${t.regel.map(r=>`<li>${r}</li>`).join('')}</ul><p class="bsp">${esc(t.bsp)}</p>`; }
+
+function regelHtml(){
+  const k=z.thema, t=TEILE[k];
+  return `
+  <div class="blatt regel">
+    <p class="klein">Thema ${THEMEN.indexOf(k)+1} von ${THEMEN.length} · Erst die Regel</p>
+    <h2>${esc(t.name)}</h2>
+    <p>${t.wann}</p>
+    ${regelListe(t)}
   </div>
-  <h2>Alle Lösungen mit Erklärung</h2>
-  ${liste}
-  <div class="knoepfe stapel">
-    ${fehler?`<button class="haupt" data-tun="fehler">Meine ${fehler} Fehler noch einmal üben</button>`:''}
-    <button class="${fehler?'neben':'haupt'}" data-tun="neu">Ganz von vorne anfangen</button>
+  <div class="knoepfe"><button class="haupt" data-tun="ueben">Verstanden, jetzt üben</button></div>`;
+}
+
+function uebungHtml(){
+  const f = NACH_ID[z.liste[z.pos]]; const n = z.liste.length; const t = TEILE[z.thema];
+  const fertig = z.status==='richtig' || z.status==='geloest';
+  const weg = z.weg[f.id] || [];
+  let eingabe;
+  if(f.o){
+    eingabe = `<div class="wahl">${f.o.map((o,i)=>{
+      let kl = 'opt';
+      if(fertig && i===f.a) kl += ' opt-gut';
+      else if(weg.includes(i)) kl += ' opt-falsch';
+      const aus = fertig || weg.includes(i);
+      return `<button class="${kl}" aria-pressed="${z.wahl===i}" data-tun="wahl" data-i="${i}" ${aus?'disabled':''}>${esc(o)}</button>`; }).join('')}</div>`;
+  } else {
+    eingabe = `<label class="klein" for="antwort">Deine Antwort</label>
+      <input class="eingabe ${z.status==='richtig'?'ein-gut':''}${z.status==='geloest'?' ein-falsch':''}" id="antwort" type="text" value="${esc(z.text)}" placeholder="Hier schreiben" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="done" ${fertig?'disabled':''}>`;
+  }
+  let rueck = '';
+  if(z.hinweis) rueck = `<p class="daneben">${f.o?'Tippe zuerst eine Antwort an.':'Schreib zuerst eine Antwort.'}</p>`;
+  else if(z.status==='falsch1') rueck = `<div class="rueck tipp"><b>Noch nicht ganz.</b> ${esc(f.t)} <b>Versuch es noch einmal.</b></div>`;
+  else if(z.status==='richtig') rueck = `<div class="rueck gut"><b>${z.erst[f.id]?'Richtig!':'Richtig – im zweiten Versuch!'}</b> ${esc(f.e)}</div>`;
+  else if(z.status==='geloest') rueck = `<div class="rueck falsch"><b>Die richtige Antwort ist: ${esc(loesung(f))}</b><br>${esc(f.e)}</div>`;
+  const letzte = z.pos===n-1;
+  return `
+  <div class="kopfzeile"><span class="klein">${esc(t.name)}${z.wiederholung?' · Wiederholung':''}</span><span class="klein">Aufgabe ${z.pos+1} von ${n}</span></div>
+  <div class="balken"><i style="width:${(z.pos+(fertig?1:0))/n*100}%"></i></div>
+  <div class="blatt">
+    <p class="satz">${satzHtml(f, fertig ? loesung(f) : null)}</p>
+    ${eingabe}
+    ${rueck}
+    <button class="tippknopf" data-tun="regelauf" aria-expanded="${z.regelAuf}">${z.regelAuf?'Regel ausblenden':'Regel noch einmal lesen'}</button>
+    ${z.regelAuf ? `<div class="regel regel-klein">${regelListe(t)}</div>` : ''}
+  </div>
+  <div class="knoepfe">
+    ${fertig ? `<button class="haupt" data-tun="weiter">${letzte?'Thema abschließen':'Weiter'}</button>`
+             : `<button class="haupt" data-tun="pruefen">Prüfen</button>`}
   </div>`;
 }
 
+function endeHtml(){
+  const k = z.thema; const g = z.liste.length; const r = z.liste.filter(id=>z.erst[id]).length;
+  const falsch = g-r;
+  const spruch = falsch===0 ? 'Alles beim ersten Versuch richtig. Super!'
+    : r/g >= .6 ? 'Gut gemacht! Übe die schwierigen Aufgaben noch einmal, dann sitzt es.'
+    : 'Das war ein schweres Thema. Lies die Regel noch einmal und übe die schwierigen Aufgaben.';
+  const naechstes = naechstesThema(k);
+  return `
+  <div class="blatt">
+    <p class="klein">${z.wiederholung?'Wiederholung geschafft':'Thema geschafft'}</p>
+    <h1>${esc(TEILE[k].name)}</h1>
+    <p class="note">${r} <span class="leise" style="font-size:1.4rem">von ${g}</span></p>
+    <p>beim ersten Versuch richtig. ${spruch}</p>
+    ${z.sende==='laeuft'?'<p class="leise">Wird gespeichert …</p>':''}
+    ${z.sende==='ok'?'<p class="richtig">Gespeichert.</p>':''}
+    ${z.sende==='fehler'?'<p class="daneben">Das Speichern hat nicht geklappt. <button class="tippknopf" data-tun="senden">Noch einmal versuchen</button></p>':''}
+  </div>
+  <div class="knoepfe stapel">
+    ${falsch ? `<button class="${naechstes?'neben':'haupt'}" data-tun="fehler">Die ${falsch===1?'schwierige Aufgabe':falsch+' schwierigen Aufgaben'} noch einmal üben</button>` : ''}
+    ${naechstes ? `<button class="haupt" data-tun="thema" data-k="${naechstes}">Weiter mit: ${esc(TEILE[naechstes].name)}</button>` : ''}
+    <button class="neben" data-tun="uebersicht">Zur Übersicht</button>
+  </div>`;
+}
+
+function zeigen(){
+  const app = document.getElementById('app');
+  let h;
+  if(z.ok!==true) h = torHtml();
+  else if(z.ansicht==='start') h = startHtml();
+  else {
+    const teil = z.ansicht==='regel' ? regelHtml() : z.ansicht==='uebung' ? uebungHtml() : z.ansicht==='ende' ? endeHtml() : uebersichtHtml();
+    h = leiste() + teil;
+  }
+  if(z.fragtNeu) h += `<div class="schleier" data-tun="neunein">
+    <div class="fenster" role="dialog" aria-modal="true" aria-labelledby="fenster-titel" data-tun="nichts">
+      <h2 id="fenster-titel">Wirklich von vorne anfangen?</h2>
+      <p>Dein ganzer Lernstand auf diesem Gerät wird gelöscht. Du landest wieder auf dem Startbildschirm.</p>
+      <div class="knoepfe stapel">
+        <button class="haupt" data-tun="neu">Ja, von vorne anfangen</button>
+        <button class="neben" data-tun="neunein">Nein, weiterlernen</button>
+      </div>
+    </div></div>`;
+  if(MIT_SPEICHERN && z.ok===true) h += `<div class="fuss"><button class="punkt" data-tun="punkt" aria-label="Lernstand ansehen"></button></div>`;
+  if(z.admin) h += adminHtml();
+  app.innerHTML = h;
+  if(z.fragtNeu){ const k=document.querySelector('.fenster .neben'); if(k) k.focus(); }
+  if(z.admin && z.admin!=='liste' && z.admin!=='laedt'){ const c=document.getElementById('admincode'); if(c) c.focus(); }
+  if(z.ansicht==='uebung' && z.status==='falsch1' && !z.fragtNeu && !z.admin){ const a=document.getElementById('antwort'); if(a){ a.focus(); a.select(); } }
+  sichern();
+}
+
+/* ---------- Abläufe ---------- */
 function nachOben(){ try{ window.scrollTo(0,0); }catch(e){} }
-function gehe(p){ z.pos=p; z.tippAuf=false; zeigen(); nachOben(); }
+function ansicht(a){ z.ansicht=a; zeigen(); nachOben(); }
+function aufgabeLeeren(){ z.wahl=null; z.text=''; z.status=null; z.hinweis=false; z.regelAuf=false; }
+function themaStarten(k){
+  z.thema=k; z.liste=fragenVon(k).map(f=>f.id); z.pos=0; z.versuche={}; z.erst={}; z.weg={};
+  z.wiederholung=false; z.sende=null; aufgabeLeeren(); ansicht('regel');
+}
+function pruefen(){
+  const f = NACH_ID[z.liste[z.pos]];
+  if(f.o ? z.wahl===null : !z.text.trim()){ z.hinweis=true; zeigen(); return; }
+  z.hinweis=false;
+  if(istRichtig(f)){ z.erst[f.id] = !(z.versuche[f.id]>0); z.status='richtig'; }
+  else {
+    z.versuche[f.id] = (z.versuche[f.id]||0)+1;
+    z.erst[f.id] = false;
+    if(f.o){ z.weg[f.id] = (z.weg[f.id]||[]).concat(z.wahl); z.wahl=null; }
+    z.status = z.versuche[f.id]>=2 ? 'geloest' : 'falsch1';
+  }
+  zeigen();
+}
+function weiter(){
+  if(z.pos < z.liste.length-1){ z.pos++; aufgabeLeeren(); zeigen(); nachOben(); return; }
+  const g=z.liste.length, r=z.liste.filter(id=>z.erst[id]).length;
+  z.sende=null;
+  if(!z.wiederholung){
+    z.fertig[z.thema] = {r, g};
+    ansicht('ende');
+    senden({name:(z.name||'').trim().slice(0,30)||'Ohne Namen', richtig:r, gesamt:g, teile:{[z.thema]:[r,g]}});
+  } else ansicht('ende');
+}
 
 document.addEventListener('click', ev=>{
-  const b=ev.target.closest('[data-tun]'); if(!b) return;
-  const tun=b.dataset.tun; const st=schritte()[z.pos];
-  if(tun==='los'){
+  const b = ev.target.closest('[data-tun]'); if(!b) return;
+  const tun = b.dataset.tun;
+  if(tun==='nichts') return;
+  if(tun==='torja'){ z.ok=true; ansicht(z.name.trim()?'uebersicht':'start'); }
+  else if(tun==='tornein'){ z.ok='nein'; zeigen(); nachOben(); }
+  else if(tun==='torzurueck'){ z.ok=false; zeigen(); nachOben(); }
+  else if(tun==='los'){
     if(MIT_SPEICHERN && !(z.name||'').trim()){ z.nameFehlt=true; zeigen(); const n=document.getElementById('spitzname'); if(n) n.focus(); return; }
-    z.nameFehlt=false; z.phase='lauf'; gehe(0); }
+    z.nameFehlt=false; ansicht('uebersicht'); }
+  else if(tun==='uebersicht'){ ansicht('uebersicht'); }
+  else if(tun==='thema'){ themaStarten(b.dataset.k); }
+  else if(tun==='ueben'){ z.pos=0; aufgabeLeeren(); ansicht('uebung'); }
+  else if(tun==='wahl'){ z.wahl=Number(b.dataset.i); z.hinweis=false; zeigen(); }
+  else if(tun==='pruefen'){ pruefen(); }
+  else if(tun==='weiter'){ weiter(); }
+  else if(tun==='regelauf'){ z.regelAuf=!z.regelAuf; zeigen(); }
+  else if(tun==='fehler'){ z.liste=z.liste.filter(id=>!z.erst[id]); z.pos=0; z.versuche={}; z.erst={}; z.weg={}; z.wiederholung=true; z.sende=null; aufgabeLeeren(); ansicht('uebung'); }
+  else if(tun==='senden'){ senden(); }
+  else if(tun==='neufrage'){ z.fragtNeu=true; zeigen(); }
+  else if(tun==='neunein'){ z.fragtNeu=false; zeigen(); }
+  else if(tun==='neu'){ z.fertig={}; z.thema=null; z.fragtNeu=false; z.sende=null; aufgabeLeeren(); ansicht('start'); }
   else if(tun==='punkt'){ z.admin='code'; zeigen(); }
   else if(tun==='adminzu'){ z.admin=null; adminDaten=null; zeigen(); }
   else if(tun==='adminok'){ const c=document.getElementById('admincode'); const w=c?c.value.trim():''; if(w) auswertungHolen(w); }
-  else if(tun==='senden'){ senden(); }
-  else if(tun==='wahl'){ z.antw[st.frage.id]=Number(b.dataset.i); zeigen(); }
-  else if(tun==='tipp'){ z.tippAuf=!z.tippAuf; zeigen(); }
-  else if(tun==='weiter'){ gehe(z.pos+1); }
-  else if(tun==='zurueck'){ gehe(z.pos-1); }
-  else if(tun==='sprung'){ const id=Number(b.dataset.id); gehe(schritte().findIndex(s=>s.frage&&s.frage.id===id)); }
-  else if(tun==='abgeben'){ const ganz = z.aktiv.length===FRAGEN.length; z.phase='ergebnis'; z.sende=null; zeigen(); nachOben(); if(MIT_SPEICHERN && ganz) senden(); }
-  else if(tun==='fehler'){ const f=z.aktiv.filter(id=>!stimmt(NACH_ID[id])); f.forEach(id=>delete z.antw[id]); z.aktiv=f; z.phase='lauf'; gehe(0); }
-  else if(tun==='neu'){ z.aktiv=FRAGEN.map(f=>f.id); z.antw={}; z.phase='start'; z.fragtNeu=false; z.sende=null; gehe(0); }
-  else if(tun==='torja'){ z.ok=true; zeigen(); nachOben(); }
-  else if(tun==='tornein'){ z.ok='nein'; zeigen(); nachOben(); }
-  else if(tun==='torzurueck'){ z.ok=false; zeigen(); nachOben(); }
-  else if(tun==='neufrage'){ z.fragtNeu=true; zeigen(); }
-  else if(tun==='neunein'){ z.fragtNeu=false; zeigen(); }
 });
-document.addEventListener('keydown', ev=>{ if(ev.key==='Escape' && (z.fragtNeu||z.admin)){ z.fragtNeu=false; z.admin=null; adminDaten=null; zeigen(); } });
 document.addEventListener('input', ev=>{
-  if(ev.target.id==='spitzname'){ z.name=ev.target.value.slice(0,30); sichern(); return; }
-  if(ev.target.id==='admincode') return;
-  if(!ev.target.classList.contains('eingabe')) return;
-  const st=schritte()[z.pos]; if(st.frage){ z.antw[st.frage.id]=ev.target.value; sichern(); }
+  const id = ev.target.id;
+  if(id==='spitzname'){ z.name=ev.target.value.slice(0,30); sichern(); }
+  else if(id==='antwort'){ z.text=ev.target.value; if(z.hinweis){ z.hinweis=false; } }
 });
 document.addEventListener('keydown', ev=>{
+  if(ev.key==='Escape' && (z.fragtNeu||z.admin)){ z.fragtNeu=false; z.admin=null; adminDaten=null; zeigen(); return; }
   if(ev.key!=='Enter') return;
-  if(ev.target.id==='spitzname'){ ev.preventDefault(); const b=document.querySelector('[data-tun="los"]'); if(b) b.click(); }
-  else if(ev.target.id==='admincode'){ ev.preventDefault(); const b=document.querySelector('[data-tun="adminok"]'); if(b) b.click(); }
-  else if(ev.target.classList.contains('eingabe')){ ev.preventDefault(); gehe(z.pos+1); }
+  const id = ev.target.id;
+  if(id==='spitzname'){ ev.preventDefault(); const b=document.querySelector('[data-tun="los"]'); if(b) b.click(); }
+  else if(id==='admincode'){ ev.preventDefault(); const b=document.querySelector('[data-tun="adminok"]'); if(b) b.click(); }
+  else if(id==='antwort'){ ev.preventDefault(); pruefen(); }
 });
 
 laden();
-if(z.pos>=schritte().length) z.pos=0;
 zeigen();
+
 </script>
 </body>
 </html>
